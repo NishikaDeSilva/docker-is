@@ -32,9 +32,9 @@ ARG WSO2_SERVER_NAME=wso2is
 ARG WSO2_SERVER_VERSION=5.8.0
 ARG WSO2_SERVER=${WSO2_SERVER_NAME}-${WSO2_SERVER_VERSION}
 ARG WSO2_SERVER_HOME=${USER_HOME}/${WSO2_SERVER}
-ARG WSO2_SERVER_DIST_URL=https://bintray.com/wso2/binaryGA/download_file?file_path=${WSO2_SERVER}.zip
+ARG FILES=./files
 # build arguments for external artifacts
-ARG MYSQL_CONNECTOR_VERSION=5.1.47
+ARG POSTGRES_CONNECTOR_VERSION=9.4.1212
 # build argument for MOTD
 ARG MOTD="\n\
 Welcome to WSO2 Docker resources.\n\
@@ -57,7 +57,7 @@ RUN \
     && chmod -R 755 ${USER_HOME}/.java \
     && chown -R ${USER}:${USER_GROUP} ${USER_HOME}/.java
 
-# copy init script to user home
+# copy init script to user homeuser
 COPY --chown=wso2carbon:wso2 docker-entrypoint.sh ${USER_HOME}/
 # install required packages
 RUN \
@@ -68,13 +68,16 @@ RUN \
         wget \
     && rm -rf /var/lib/apt/lists/*
 # add the WSO2 product distribution to user's home directory
-RUN \
-    wget --no-check-certificate -O ${WSO2_SERVER}.zip "${WSO2_SERVER_DIST_URL}" \
-    && unzip -d ${USER_HOME} ${WSO2_SERVER}.zip \
-    && chown wso2carbon:wso2 -R ${WSO2_SERVER_HOME} \
-    && rm -f ${WSO2_SERVER}.zip
-# add MySQL JDBC connector to server home as a third party library
-ADD --chown=wso2carbon:wso2 http://central.maven.org/maven2/mysql/mysql-connector-java/${MYSQL_CONNECTOR_VERSION}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar ${WSO2_SERVER_HOME}/repository/components/dropins/
+COPY --chown=wso2carbon:wso2 ${FILES}/${WSO2_SERVER}/ ${WSO2_SERVER_HOME}/
+# copy shared artifacts to a temporary location
+COPY --chown=wso2carbon:wso2 ${FILES}/${WSO2_SERVER}/repository/deployment/ ${USER_HOME}/wso2-tmp/deployment/
+
+# add POSTGRES JDBC connector to server home as a third party library
+ADD --chown=wso2carbon:wso2 https://jdbc.postgresql.org/download/postgresql-${POSTGRES_CONNECTOR_VERSION}.jar ${WSO2_SERVER_HOME}/repository/components/dropins/
+
+# add libraries for Kubernetes membership scheme based clustering
+ADD --chown=wso2carbon:wso2 https://repo1.maven.org/maven2/dnsjava/dnsjava/2.1.8/dnsjava-2.1.8.jar ${WSO2_SERVER_HOME}/repository/components/lib/
+ADD --chown=wso2carbon:wso2 https://repo1.maven.org/maven2/org/wso2/carbon/kubernetes/artifacts/kubernetes-membership-scheme/1.0.5/kubernetes-membership-scheme-1.0.5.jar ${WSO2_SERVER_HOME}/repository/components/dropins/
 
 # set the user and work directory
 USER ${USER_ID}
